@@ -8,17 +8,11 @@
     "functions_directory": "functions",
     "client_directory": "client"
   },
-  "functions": [
-    {
-      "functionName": "AutoMateBRDFunction",
-      "directory": "functions/AutoMateBRDFunction",
-      "type": "Advanced",
-      "memory": 512,
-      "timeout": 300,
-      "runtime": "nodejs18.x",
-      "description": "Main backend function for transcript processing, BRD generation, and Zoho Writer document creation"
-    }
-  ],
+  "functions": {
+    "targets": ["AutoMateBRDFunction"],
+    "source": "functions",
+    "ignore": [".git", "node_modules"]
+  },
   "client": [
     {
       "clientName": "AutoMateBRDClient",
