@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 
 const API_BASE = process.env.REACT_APP_API_BASE_URL || '';
 
@@ -7,15 +7,58 @@ const ZOHO_LOGO =
 
 const ZOHO_RED = '#E42527';
 const ZOHO_RED_DARK = '#C8202C';
+const ZOHO_BLUE = '#226DB4';
+
+const ZOHO_PRODUCTS = [
+  'Zoho CRM', 'Zoho Desk', 'Zoho Books', 'Zoho Inventory', 'Zoho People',
+  'Zoho Recruit', 'Zoho Projects', 'Zoho Creator', 'Zoho Analytics',
+  'Zoho Campaigns', 'Zoho SalesIQ', 'Zoho Mail', 'Zoho Cliq',
+  'Zoho WorkDrive', 'Zoho Sign', 'Zoho Flow', 'Zoho Forms', 'Zoho Survey',
+];
 
 function App() {
+  const [step, setStep] = useState(1);
+
+  // Step 1 inputs
   const [file, setFile] = useState(null);
   const [transcript, setTranscript] = useState('');
+  const [projectName, setProjectName] = useState('');
+  const [clientName, setClientName] = useState('');
+  const [analystName, setAnalystName] = useState('');
+  const [projectDescription, setProjectDescription] = useState('');
+  const [managerInputs, setManagerInputs] = useState('');
+  const [selectedProducts, setSelectedProducts] = useState([]);
   const [isDragging, setIsDragging] = useState(false);
+
+  // Step 2 review
+  const [brd, setBrd] = useState(null);
+  const [previewHtml, setPreviewHtml] = useState('');
+  const [projectDetails, setProjectDetails] = useState(null);
+
+  // Step 3 push
+  const [pushResult, setPushResult] = useState(null);
+
   const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState(null);
   const [error, setError] = useState('');
   const inputRef = useRef(null);
+  const previewRef = useRef(null);
+
+  // Re-render mermaid when preview HTML updates
+  useEffect(() => {
+    if (step === 2 && previewHtml && window.mermaid) {
+      try {
+        window.mermaid.run({ querySelector: '.mermaid' });
+      } catch (e) {
+        console.warn('Mermaid render failed', e);
+      }
+    }
+  }, [previewHtml, step]);
+
+  const toggleProduct = (p) => {
+    setSelectedProducts((prev) =>
+      prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]
+    );
+  };
 
   const handleDrop = (e) => {
     e.preventDefault();
@@ -29,19 +72,28 @@ function App() {
     if (f) setFile(f);
   };
 
-  const handleSubmit = async (e) => {
+  const handleGenerate = async (e) => {
     e.preventDefault();
     setError('');
-    setResult(null);
 
     if (!file && !transcript.trim()) {
-      setError('Please upload a file or paste a transcript.');
+      setError('Please upload a meeting recording or paste a transcript.');
+      return;
+    }
+    if (!projectName.trim()) {
+      setError('Please enter the project name.');
       return;
     }
 
     const formData = new FormData();
-    if (file) formData.append('file', file);
+    if (file) formData.append('audio', file);
     if (transcript.trim()) formData.append('transcript', transcript.trim());
+    formData.append('projectName', projectName.trim());
+    formData.append('clientName', clientName.trim());
+    formData.append('analystName', analystName.trim());
+    formData.append('projectDescription', projectDescription.trim());
+    formData.append('managerInputs', managerInputs.trim());
+    formData.append('selectedProducts', JSON.stringify(selectedProducts));
 
     setLoading(true);
     try {
@@ -50,15 +102,58 @@ function App() {
         body: formData,
       });
       const data = await res.json();
-      if (!res.ok) {
+      if (!res.ok || !data.success) {
         throw new Error(data.error || `Request failed (${res.status})`);
       }
-      setResult(data);
+      setBrd(data.brd);
+      setPreviewHtml(data.html || '');
+      setProjectDetails(data.projectDetails || null);
+      setStep(2);
     } catch (err) {
       setError(err.message || 'Something went wrong. Please try again.');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handlePush = async () => {
+    setError('');
+    setLoading(true);
+    try {
+      const editedHtml = previewRef.current ? previewRef.current.innerHTML : previewHtml;
+      const res = await fetch(`${API_BASE}/push-to-zoho`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ brd, editedHtml, projectDetails }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || `Push failed (${res.status})`);
+      }
+      setPushResult(data);
+      setStep(3);
+    } catch (err) {
+      setError(err.message || 'Push to Zoho Writer failed.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resetAll = () => {
+    setStep(1);
+    setFile(null);
+    setTranscript('');
+    setProjectName('');
+    setClientName('');
+    setAnalystName('');
+    setProjectDescription('');
+    setManagerInputs('');
+    setSelectedProducts([]);
+    setBrd(null);
+    setPreviewHtml('');
+    setProjectDetails(null);
+    setPushResult(null);
+    setError('');
   };
 
   return (
@@ -67,111 +162,215 @@ function App() {
         <div style={styles.brand}>
           <img src={ZOHO_LOGO} alt="Zoho" style={styles.logo} />
           <div style={styles.divider} />
-          <h1 style={styles.title}>SMBS BRD Generator</h1>
+          <h1 style={styles.title}>Smbs-BRD Generator</h1>
         </div>
         <p style={styles.subtitle}>
-          AI-powered Business Requirements Documents — drop a meeting recording or transcript, get a polished BRD in Zoho Writer.
+          AI-powered Business Requirements Documents for Zoho implementations —
+          analyse meeting transcripts & manager notes, review, then push to Zoho Writer.
         </p>
       </header>
 
+      <div style={styles.stepper}>
+        {['Inputs', 'Review & Edit', 'Push to Writer'].map((label, i) => {
+          const n = i + 1;
+          const active = step === n;
+          const done = step > n;
+          return (
+            <div key={label} style={styles.stepItem}>
+              <div
+                style={{
+                  ...styles.stepCircle,
+                  ...(active ? styles.stepActive : {}),
+                  ...(done ? styles.stepDone : {}),
+                }}
+              >
+                {done ? '✓' : n}
+              </div>
+              <span style={{ ...styles.stepLabel, ...(active ? { color: ZOHO_RED, fontWeight: 600 } : {}) }}>
+                {label}
+              </span>
+              {n < 3 && <div style={styles.stepConnector} />}
+            </div>
+          );
+        })}
+      </div>
+
       <main style={styles.main}>
-        <form onSubmit={handleSubmit} style={styles.card}>
-          <label style={styles.sectionLabel}>1. Upload meeting file</label>
+        {step === 1 && (
+          <form onSubmit={handleGenerate} style={styles.card}>
+            <label style={styles.sectionLabel}>Project details</label>
+            <div style={styles.grid2}>
+              <input
+                value={projectName}
+                onChange={(e) => setProjectName(e.target.value)}
+                placeholder="Project Name *"
+                style={styles.input}
+              />
+              <input
+                value={clientName}
+                onChange={(e) => setClientName(e.target.value)}
+                placeholder="Client / Company"
+                style={styles.input}
+              />
+              <input
+                value={analystName}
+                onChange={(e) => setAnalystName(e.target.value)}
+                placeholder="Business Analyst"
+                style={styles.input}
+              />
+              <input
+                value={projectDescription}
+                onChange={(e) => setProjectDescription(e.target.value)}
+                placeholder="Short Description"
+                style={styles.input}
+              />
+            </div>
 
-          <div
-            onDragOver={(e) => {
-              e.preventDefault();
-              setIsDragging(true);
-            }}
-            onDragLeave={() => setIsDragging(false)}
-            onDrop={handleDrop}
-            onClick={() => inputRef.current && inputRef.current.click()}
-            style={{
-              ...styles.dropzone,
-              ...(isDragging ? styles.dropzoneActive : {}),
-            }}
-          >
-            <div style={styles.dropIcon}>⬆</div>
-            <div style={styles.dropTitle}>
-              {file ? file.name : 'Drag & drop a file here, or click to browse'}
+            <label style={styles.sectionLabel}>Meeting recording / document</label>
+            <div
+              onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+              onDragLeave={() => setIsDragging(false)}
+              onDrop={handleDrop}
+              onClick={() => inputRef.current && inputRef.current.click()}
+              style={{ ...styles.dropzone, ...(isDragging ? styles.dropzoneActive : {}) }}
+            >
+              <div style={styles.dropIcon}>⬆</div>
+              <div style={styles.dropTitle}>
+                {file ? file.name : 'Drag & drop or click to browse'}
+              </div>
+              <div style={styles.dropHint}>
+                Supported: .mp4, .mp3, .wav, .m4a, .txt, .pdf, .docx
+              </div>
+              <input
+                ref={inputRef}
+                type="file"
+                accept=".mp4,.mp3,.wav,.m4a,.txt,.pdf,.docx"
+                onChange={handleFileChange}
+                style={{ display: 'none' }}
+              />
             </div>
-            <div style={styles.dropHint}>
-              Supported: .mp4, .mp3, .wav, .m4a, .txt, .pdf, .docx
-            </div>
-            <input
-              ref={inputRef}
-              type="file"
-              accept=".mp4,.mp3,.wav,.m4a,.txt,.pdf,.docx"
-              onChange={handleFileChange}
-              style={{ display: 'none' }}
+
+            <label style={styles.sectionLabel}>Meeting transcript (optional)</label>
+            <textarea
+              value={transcript}
+              onChange={(e) => setTranscript(e.target.value)}
+              placeholder="Paste meeting transcript here, or leave blank if uploading a recording..."
+              rows={6}
+              style={styles.textarea}
             />
+
+            <label style={styles.sectionLabel}>Manager / Meeting Manager inputs</label>
+            <textarea
+              value={managerInputs}
+              onChange={(e) => setManagerInputs(e.target.value)}
+              placeholder="Add manager's notes, additional context, decisions, or clarifications to merge with the transcript..."
+              rows={5}
+              style={styles.textarea}
+            />
+
+            <label style={styles.sectionLabel}>Zoho products in scope</label>
+            <div style={styles.chipRow}>
+              {ZOHO_PRODUCTS.map((p) => {
+                const selected = selectedProducts.includes(p);
+                return (
+                  <button
+                    type="button"
+                    key={p}
+                    onClick={() => toggleProduct(p)}
+                    style={{ ...styles.chip, ...(selected ? styles.chipSelected : {}) }}
+                  >
+                    {p}
+                  </button>
+                );
+              })}
+            </div>
+
+            {error && <div style={styles.error}>{error}</div>}
+
+            <button
+              type="submit"
+              disabled={loading}
+              style={{ ...styles.button, ...(loading ? styles.buttonDisabled : {}) }}
+            >
+              {loading ? 'Analysing & generating BRD…' : 'Generate BRD →'}
+            </button>
+          </form>
+        )}
+
+        {step === 2 && (
+          <div style={styles.card}>
+            <label style={styles.sectionLabel}>Review & edit the BRD</label>
+            <p style={styles.helpText}>
+              The document below is editable. Make any changes inline, then push the
+              final version to Zoho Writer.
+            </p>
+
+            <div
+              ref={previewRef}
+              contentEditable
+              suppressContentEditableWarning
+              style={styles.previewDoc}
+              dangerouslySetInnerHTML={{ __html: previewHtml }}
+            />
+
+            {error && <div style={styles.error}>{error}</div>}
+
+            <div style={styles.actionRow}>
+              <button
+                type="button"
+                onClick={() => setStep(1)}
+                style={styles.buttonSecondary}
+                disabled={loading}
+              >
+                ← Back to inputs
+              </button>
+              <button
+                type="button"
+                onClick={handlePush}
+                disabled={loading}
+                style={{ ...styles.button, ...(loading ? styles.buttonDisabled : {}), flex: 1 }}
+              >
+                {loading ? 'Pushing to Zoho Writer…' : 'Push to Zoho Writer →'}
+              </button>
+            </div>
           </div>
+        )}
 
-          <div style={styles.orRow}>
-            <div style={styles.orLine} />
-            <span style={styles.orText}>OR</span>
-            <div style={styles.orLine} />
-          </div>
-
-          <label style={styles.sectionLabel}>2. Paste a transcript</label>
-          <textarea
-            value={transcript}
-            onChange={(e) => setTranscript(e.target.value)}
-            placeholder="Paste your meeting transcript here..."
-            rows={8}
-            style={styles.textarea}
-          />
-
-          {error && <div style={styles.error}>{error}</div>}
-
-          <button
-            type="submit"
-            disabled={loading}
-            style={{
-              ...styles.button,
-              ...(loading ? styles.buttonDisabled : {}),
-            }}
-          >
-            {loading ? 'Generating BRD...' : 'Generate BRD'}
-          </button>
-        </form>
-
-        {result && (
-          <div style={styles.resultCard}>
-            <h2 style={styles.resultTitle}>✨ BRD generated successfully</h2>
-            {result.documentId && (
+        {step === 3 && pushResult && (
+          <div style={styles.successCard}>
+            <div style={styles.successIcon}>✓</div>
+            <h2 style={styles.resultTitle}>BRD pushed to Zoho Writer</h2>
+            {pushResult.documentName && (
               <div style={styles.resultRow}>
-                Document ID: <strong>{result.documentId}</strong>
+                <strong>{pushResult.documentName}</strong>
+              </div>
+            )}
+            {pushResult.documentId && (
+              <div style={styles.resultRow}>
+                Document ID: <code>{pushResult.documentId}</code>
               </div>
             )}
             <div style={styles.resultLinks}>
-              {result.viewUrl && (
+              {pushResult.documentUrl && (
                 <a
-                  href={result.viewUrl}
+                  href={pushResult.documentUrl}
                   target="_blank"
                   rel="noreferrer"
                   style={styles.linkPrimary}
                 >
-                  Open BRD in Zoho Writer →
+                  Open in Zoho Writer →
                 </a>
               )}
-              {result.downloadUrl && (
-                <a
-                  href={result.downloadUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  style={styles.linkSecondary}
-                >
-                  Download BRD →
-                </a>
-              )}
+              <button type="button" onClick={resetAll} style={styles.linkSecondary}>
+                Create another BRD
+              </button>
             </div>
           </div>
         )}
       </main>
 
       <footer style={styles.footer}>
-        Powered by Zoho Catalyst · Zoho Writer · OpenAI
+        Powered by Zoho Catalyst · Zoho Writer · GitHub Models
       </footer>
     </div>
   );
@@ -377,6 +576,144 @@ const styles = {
     fontSize: 12.5,
     marginTop: 40,
     letterSpacing: '0.3px',
+  },
+  stepper: {
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 0,
+    padding: '8px 24px 24px',
+    flexWrap: 'wrap',
+    maxWidth: 720,
+    margin: '0 auto',
+  },
+  stepItem: { display: 'flex', alignItems: 'center', gap: 8 },
+  stepCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: '50%',
+    background: '#e5e7eb',
+    color: '#6b7280',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontWeight: 600,
+    fontSize: 14,
+    transition: 'all 0.2s ease',
+  },
+  stepActive: {
+    background: `linear-gradient(135deg, ${ZOHO_RED} 0%, ${ZOHO_RED_DARK} 100%)`,
+    color: '#fff',
+    boxShadow: '0 4px 10px rgba(228, 37, 39, 0.35)',
+  },
+  stepDone: { background: '#10b981', color: '#fff' },
+  stepLabel: { fontSize: 13.5, color: '#374151', marginRight: 8, fontWeight: 500 },
+  stepConnector: {
+    width: 40,
+    height: 2,
+    background: '#e5e7eb',
+    marginRight: 8,
+  },
+  grid2: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: 12,
+    marginBottom: 4,
+  },
+  input: {
+    padding: '11px 14px',
+    borderRadius: 10,
+    border: '1px solid #e5e7eb',
+    background: 'rgba(255,255,255,0.8)',
+    fontSize: 14,
+    fontFamily: 'inherit',
+    outline: 'none',
+    transition: 'border-color 0.2s ease',
+  },
+  chipRow: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 4,
+  },
+  chip: {
+    padding: '6px 12px',
+    borderRadius: 999,
+    border: '1px solid #e5e7eb',
+    background: 'rgba(255,255,255,0.85)',
+    cursor: 'pointer',
+    fontSize: 13,
+    fontFamily: 'inherit',
+    color: '#374151',
+    transition: 'all 0.15s ease',
+  },
+  chipSelected: {
+    background: `linear-gradient(135deg, ${ZOHO_RED} 0%, ${ZOHO_RED_DARK} 100%)`,
+    color: '#fff',
+    borderColor: ZOHO_RED,
+    boxShadow: '0 3px 8px rgba(228, 37, 39, 0.25)',
+  },
+  helpText: {
+    fontSize: 13,
+    color: '#6b7280',
+    margin: '4px 0 8px',
+    lineHeight: 1.5,
+  },
+  previewDoc: {
+    background: '#fff',
+    border: '1px solid #e5e7eb',
+    borderRadius: 12,
+    padding: '24px 28px',
+    minHeight: 400,
+    maxHeight: 640,
+    overflowY: 'auto',
+    fontSize: 14,
+    lineHeight: 1.65,
+    color: '#1f2937',
+    outline: 'none',
+  },
+  actionRow: {
+    display: 'flex',
+    gap: 12,
+    alignItems: 'center',
+    marginTop: 6,
+    flexWrap: 'wrap',
+  },
+  buttonSecondary: {
+    padding: '12px 18px',
+    borderRadius: 10,
+    border: '1px solid #d1d5db',
+    background: '#fff',
+    color: '#374151',
+    cursor: 'pointer',
+    fontWeight: 600,
+    fontSize: 14,
+    fontFamily: 'inherit',
+  },
+  successCard: {
+    background: 'rgba(255,255,255,0.9)',
+    backdropFilter: 'blur(14px)',
+    WebkitBackdropFilter: 'blur(14px)',
+    border: '1px solid rgba(16, 185, 129, 0.2)',
+    borderLeft: '4px solid #10b981',
+    borderRadius: 16,
+    padding: 32,
+    boxShadow: '0 8px 24px rgba(0,0,0,0.06)',
+    textAlign: 'center',
+  },
+  successIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: '50%',
+    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+    color: '#fff',
+    fontSize: 32,
+    fontWeight: 700,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    margin: '0 auto 16px',
+    boxShadow: '0 8px 20px rgba(16, 185, 129, 0.35)',
   },
 };
 
