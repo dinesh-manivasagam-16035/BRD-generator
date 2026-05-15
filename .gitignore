@@ -3,9 +3,6 @@ node_modules/
 functions/AutoMateBRDFunction/node_modules/
 client/node_modules/
 
-# Build output
-client/build/
-
 # Environment variables
 .env
 .env.local

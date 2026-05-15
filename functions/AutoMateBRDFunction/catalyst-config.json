@@ -1,0 +1,12 @@
+{
+  "deployment": {
+    "name": "AutoMateBRDFunction",
+    "type": "advancedio",
+    "stack": "node18",
+    "memory": 512,
+    "timeout": 30
+  },
+  "execution": {
+    "main": "index.js"
+  }
+}
