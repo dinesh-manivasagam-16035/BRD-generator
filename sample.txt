@@ -1,0 +1,1 @@
+Meeting transcript: discussed new customer portal with login, dashboard, reports, and admin role management. Stakeholders: PM, Tech Lead, QA. Deadline: Q1.

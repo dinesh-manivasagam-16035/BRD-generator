@@ -1,0 +1,30 @@
+{
+  "defaults": {
+    "project": 1,
+    "env": 1
+  },
+  "actives": {
+    "project": 1,
+    "env": 1
+  },
+  "projects": [
+    {
+      "idx": 1,
+      "id": "6677000000007058",
+      "name": "Project-Rainfall",
+      "domain": {
+        "id": "10087170343",
+        "name": "project-rainfall-860725555.development"
+      },
+      "timezone": "Asia/Kolkata",
+      "env": [
+        {
+          "idx": 1,
+          "id": "860725555",
+          "name": "Development",
+          "type": 3
+        }
+      ]
+    }
+  ]
+}

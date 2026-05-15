@@ -1,0 +1,9 @@
+{
+	"servers": {
+		"AutoMateBRD": {
+			"type": "http",
+			"url": "https://automatebrd-60067979151.zohomcp.in/mcp/51fab1789e038a41f98ecbd49d56c0ea/message"
+		}
+	},
+	"inputs": []
+}

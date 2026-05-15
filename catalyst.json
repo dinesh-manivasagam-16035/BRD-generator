@@ -1,0 +1,50 @@
+{
+  "project_name": "AutoMateBRD",
+  "platform-version": "2",
+  "project_id": "41726000000013047",
+  "org_id": "60071738809",
+  "region": "IN",
+  "project_directory": {
+    "functions_directory": "functions",
+    "client_directory": "client"
+  },
+  "functions": [
+    {
+      "functionName": "AutoMateBRDFunction",
+      "directory": "functions/AutoMateBRDFunction",
+      "type": "Advanced",
+      "memory": 512,
+      "timeout": 300,
+      "runtime": "nodejs18.x",
+      "description": "Main backend function for transcript processing, BRD generation, and Zoho Writer document creation"
+    }
+  ],
+  "client": [
+    {
+      "clientName": "AutoMateBRDClient",
+      "directory": "client"
+    }
+  ],
+  "web": [
+    {
+      "type": "Advanced IO Function",
+      "functionName": "AutoMateBRDFunction",
+      "path": "/generate-brd"
+    },
+    {
+      "type": "Advanced IO Function",
+      "functionName": "AutoMateBRDFunction",
+      "path": "/push-to-zoho"
+    },
+    {
+      "type": "Advanced IO Function",
+      "functionName": "AutoMateBRDFunction",
+      "path": "/health"
+    },
+    {
+      "type": "Catalyst Client",
+      "clientName": "AutoMateBRDClient",
+      "path": "/*"
+    }
+  ]
+}
