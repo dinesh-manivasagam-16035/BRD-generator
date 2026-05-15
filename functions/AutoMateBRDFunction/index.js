@@ -12,10 +12,22 @@ const { createZohoWriterDoc, brdToHTML } = require('./zohoWriter');
 
 const app = express();
 // Using GitHub Models (free tier) as the LLM backend — OpenAI-compatible API.
-const openai = new OpenAI({
-  apiKey: process.env.GITHUB_TOKEN,
-  baseURL: 'https://models.github.ai/inference',
-});
+// Lazy instantiation so module load never fails when env vars are missing.
+let _openai = null;
+function getOpenAI() {
+  if (_openai) return _openai;
+  const apiKey = process.env.GITHUB_TOKEN || process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    const err = new Error('Missing GITHUB_TOKEN / OPENAI_API_KEY env var');
+    err.code = 'MISSING_LLM_KEY';
+    throw err;
+  }
+  _openai = new OpenAI({
+    apiKey,
+    baseURL: process.env.GITHUB_TOKEN ? 'https://models.github.ai/inference' : undefined,
+  });
+  return _openai;
+}
 
 // ── Middleware ────────────────────────────────────────────────────────────────
 app.use(cors());
@@ -87,7 +99,20 @@ app.post('/generate-brd', upload.single('audio'), async (req, res) => {
       }),
     };
 
-    const managerInputs = (req.body.managerInputs || '').trim();
+    // managerInputs may arrive as a string, an object (e.g. {"priority":"high"}),
+    // or be omitted entirely. Normalize to a trimmed string for downstream prompt use.
+    let managerInputs = req.body.managerInputs;
+    if (managerInputs && typeof managerInputs === 'object') {
+      try {
+        managerInputs = JSON.stringify(managerInputs);
+      } catch (_) {
+        managerInputs = '';
+      }
+    } else if (typeof managerInputs === 'string') {
+      managerInputs = managerInputs.trim();
+    } else {
+      managerInputs = '';
+    }
 
     // ── 2. Resolve transcript text ───────────────────────────────────────────
     let transcriptText = '';
@@ -123,7 +148,7 @@ app.post('/generate-brd', upload.single('audio'), async (req, res) => {
     }
 
     // ── 3. Generate BRD JSON via OpenAI (transcript + manager inputs) ──────
-    const brd = await generateBRD(transcriptText, projectDetails, openai, managerInputs);
+    const brd = await generateBRD(transcriptText, projectDetails, getOpenAI(), managerInputs);
 
     // ── 4. Render preview HTML — DO NOT push to Zoho yet ─────────────────────
     const html = brdToHTML(brd, projectDetails);
@@ -190,7 +215,7 @@ async function transcribeFile(filePath, originalName) {
   // Whisper requires the filename to have a valid extension for format detection
   fileStream.path = originalName || path.basename(filePath);
 
-  const response = await openai.audio.transcriptions.create({
+  const response = await getOpenAI().audio.transcriptions.create({
     model: 'whisper-1',
     file:  fileStream,
     response_format: 'text',
