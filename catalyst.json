@@ -11,7 +11,7 @@
   "functions": {
     "targets": ["AutoMateBRDFunction"],
     "source": "functions",
-    "ignore": [".git", "node_modules"]
+    "ignore": [".git"]
   },
   "client": [
     {

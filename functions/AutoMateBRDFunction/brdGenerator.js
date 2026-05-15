@@ -89,7 +89,7 @@ Rules:
 - Use professional business language.
 - Identify ALL Zoho products needed in "zohoProducts" (e.g., "Zoho CRM", "Zoho Desk", "Zoho Books", "Zoho Creator", "Zoho Analytics", "Zoho Flow").
 - For EVERY product in "zohoProducts" produce a corresponding entry in "productImplementations" with product-specific modules, customizations, workflows, integrations, and FR IDs prefixed by product code (FR-CRM-001, FR-DESK-001, FR-BOOKS-001, FR-CREATOR-001, FR-ANALYTICS-001, etc.).
-- "integrationWorkflow.mermaidDiagram" MUST be valid Mermaid `flowchart TD` syntax (no backticks, no code fences, real newline characters). Use node IDs A,B,C... with labels like A[Zoho CRM]. Show the cross-product data flow described in the transcript.
+- "integrationWorkflow.mermaidDiagram" MUST be valid Mermaid \`flowchart TD\` syntax (no backticks, no code fences, real newline characters). Use node IDs A,B,C... with labels like A[Zoho CRM]. Show the cross-product data flow described in the transcript.
 - If only ONE Zoho product is needed, still produce a single-node Mermaid flowchart.
 - Return ONLY valid JSON.
 `;
