@@ -1,144 +1,37 @@
-import React, { useState, useRef } from 'react';
+import React, { useRef, useState } from 'react';
 
-const styles = {
-  container: {
-    minHeight: '100vh',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: '24px',
-  },
-  card: {
-    background: '#fff',
-    borderRadius: '16px',
-    boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
-    padding: '40px',
-    width: '100%',
-    maxWidth: '640px',
-  },
-  title: {
-    fontSize: '28px',
-    fontWeight: '700',
-    color: '#1a202c',
-    marginBottom: '8px',
-  },
-  subtitle: {
-    fontSize: '14px',
-    color: '#718096',
-    marginBottom: '32px',
-  },
-  label: {
-    display: 'block',
-    fontSize: '13px',
-    fontWeight: '600',
-    color: '#4a5568',
-    marginBottom: '6px',
-    textTransform: 'uppercase',
-    letterSpacing: '0.05em',
-  },
-  section: { marginBottom: '24px' },
-  dropzone: (isDragging) => ({
-    border: `2px dashed ${isDragging ? '#667eea' : '#cbd5e0'}`,
-    borderRadius: '10px',
-    padding: '32px',
-    textAlign: 'center',
-    cursor: 'pointer',
-    background: isDragging ? '#ebf4ff' : '#f7fafc',
-    transition: 'all 0.2s',
-  }),
-  dropzoneText: { color: '#718096', fontSize: '14px' },
-  fileName: {
-    marginTop: '10px',
-    fontSize: '13px',
-    color: '#2d3748',
-    fontWeight: '600',
-  },
-  textarea: {
-    width: '100%',
-    minHeight: '120px',
-    border: '1px solid #e2e8f0',
-    borderRadius: '8px',
-    padding: '12px',
-    fontSize: '14px',
-    color: '#2d3748',
-    resize: 'vertical',
-    fontFamily: 'inherit',
-    outline: 'none',
-  },
-  button: (loading) => ({
-    width: '100%',
-    padding: '14px',
-    background: loading ? '#a0aec0' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    color: '#fff',
-    border: 'none',
-    borderRadius: '10px',
-    fontSize: '16px',
-    fontWeight: '600',
-    cursor: loading ? 'not-allowed' : 'pointer',
-    transition: 'opacity 0.2s',
-  }),
-  error: {
-    background: '#fff5f5',
-    border: '1px solid #fc8181',
-    borderRadius: '8px',
-    padding: '14px',
-    color: '#c53030',
-    fontSize: '14px',
-    marginTop: '16px',
-  },
-  result: {
-    background: '#f0fff4',
-    border: '1px solid #68d391',
-    borderRadius: '8px',
-    padding: '20px',
-    marginTop: '16px',
-  },
-  resultTitle: {
-    fontSize: '16px',
-    fontWeight: '600',
-    color: '#276749',
-    marginBottom: '10px',
-  },
-  link: {
-    display: 'inline-block',
-    marginTop: '8px',
-    color: '#667eea',
-    textDecoration: 'none',
-    fontWeight: '600',
-    wordBreak: 'break-all',
-  },
-  divider: {
-    textAlign: 'center',
-    color: '#a0aec0',
-    fontSize: '13px',
-    margin: '8px 0',
-  },
-};
+const API_BASE = process.env.REACT_APP_API_BASE_URL || '';
 
-export default function App() {
+const ZOHO_LOGO =
+  'https://www.zohowebstatic.com/sites/zweb/images/zoho_general_pages/zoho-logo-web.svg';
+
+const ZOHO_RED = '#E42527';
+const ZOHO_RED_DARK = '#C8202C';
+
+function App() {
   const [file, setFile] = useState(null);
   const [transcript, setTranscript] = useState('');
   const [isDragging, setIsDragging] = useState(false);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
-  const [error, setError] = useState(null);
-  const inputRef = useRef();
+  const [error, setError] = useState('');
+  const inputRef = useRef(null);
 
   const handleDrop = (e) => {
     e.preventDefault();
     setIsDragging(false);
-    const dropped = e.dataTransfer.files[0];
-    if (dropped) setFile(dropped);
+    const f = e.dataTransfer.files && e.dataTransfer.files[0];
+    if (f) setFile(f);
   };
 
   const handleFileChange = (e) => {
-    if (e.target.files[0]) setFile(e.target.files[0]);
+    const f = e.target.files && e.target.files[0];
+    if (f) setFile(f);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError(null);
+    setError('');
     setResult(null);
 
     if (!file && !transcript.trim()) {
@@ -146,112 +39,345 @@ export default function App() {
       return;
     }
 
+    const formData = new FormData();
+    if (file) formData.append('file', file);
+    if (transcript.trim()) formData.append('transcript', transcript.trim());
+
     setLoading(true);
     try {
-      const formData = new FormData();
-      if (file) formData.append('file', file);
-      if (transcript.trim()) formData.append('transcript', transcript.trim());
-
-      const res = await fetch('/generate-brd', {
+      const res = await fetch(`${API_BASE}/generate-brd`, {
         method: 'POST',
         body: formData,
       });
-
       const data = await res.json();
-
       if (!res.ok) {
-        throw new Error(data.error || `Server error: ${res.status}`);
+        throw new Error(data.error || `Request failed (${res.status})`);
       }
-
       setResult(data);
     } catch (err) {
-      setError(err.message || 'An unexpected error occurred.');
+      setError(err.message || 'Something went wrong. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div style={styles.container}>
-      <div style={styles.card}>
-        <h1 style={styles.title}>AutoMateBRD</h1>
+    <div style={styles.page}>
+      <header style={styles.header}>
+        <div style={styles.brand}>
+          <img src={ZOHO_LOGO} alt="Zoho" style={styles.logo} />
+          <div style={styles.divider} />
+          <h1 style={styles.title}>SMBS BRD Generator</h1>
+        </div>
         <p style={styles.subtitle}>
-          Upload a meeting recording or paste a transcript to generate a Business Requirements Document automatically.
+          AI-powered Business Requirements Documents — drop a meeting recording or transcript, get a polished BRD in Zoho Writer.
         </p>
+      </header>
 
-        <form onSubmit={handleSubmit}>
-          {/* File upload */}
-          <div style={styles.section}>
-            <label style={styles.label}>Upload File (audio/video/text)</label>
-            <div
-              style={styles.dropzone(isDragging)}
-              onClick={() => inputRef.current.click()}
-              onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-              onDragLeave={() => setIsDragging(false)}
-              onDrop={handleDrop}
-            >
-              <p style={styles.dropzoneText}>
-                {isDragging ? 'Drop it here!' : 'Drag & drop a file, or click to browse'}
-              </p>
-              <p style={{ ...styles.dropzoneText, fontSize: '12px', marginTop: '4px' }}>
-                Supported: .mp4, .mp3, .wav, .m4a, .txt, .pdf, .docx
-              </p>
-              {file && <p style={styles.fileName}>Selected: {file.name}</p>}
+      <main style={styles.main}>
+        <form onSubmit={handleSubmit} style={styles.card}>
+          <label style={styles.sectionLabel}>1. Upload meeting file</label>
+
+          <div
+            onDragOver={(e) => {
+              e.preventDefault();
+              setIsDragging(true);
+            }}
+            onDragLeave={() => setIsDragging(false)}
+            onDrop={handleDrop}
+            onClick={() => inputRef.current && inputRef.current.click()}
+            style={{
+              ...styles.dropzone,
+              ...(isDragging ? styles.dropzoneActive : {}),
+            }}
+          >
+            <div style={styles.dropIcon}>⬆</div>
+            <div style={styles.dropTitle}>
+              {file ? file.name : 'Drag & drop a file here, or click to browse'}
+            </div>
+            <div style={styles.dropHint}>
+              Supported: .mp4, .mp3, .wav, .m4a, .txt, .pdf, .docx
             </div>
             <input
               ref={inputRef}
               type="file"
               accept=".mp4,.mp3,.wav,.m4a,.txt,.pdf,.docx"
-              style={{ display: 'none' }}
               onChange={handleFileChange}
+              style={{ display: 'none' }}
             />
           </div>
 
-          {/* Divider */}
-          <div style={styles.divider}>— OR —</div>
-
-          {/* Transcript textarea */}
-          <div style={styles.section}>
-            <label style={styles.label}>Paste Transcript</label>
-            <textarea
-              style={styles.textarea}
-              placeholder="Paste your meeting transcript here..."
-              value={transcript}
-              onChange={(e) => setTranscript(e.target.value)}
-            />
+          <div style={styles.orRow}>
+            <div style={styles.orLine} />
+            <span style={styles.orText}>OR</span>
+            <div style={styles.orLine} />
           </div>
 
-          <button type="submit" style={styles.button(loading)} disabled={loading}>
+          <label style={styles.sectionLabel}>2. Paste a transcript</label>
+          <textarea
+            value={transcript}
+            onChange={(e) => setTranscript(e.target.value)}
+            placeholder="Paste your meeting transcript here..."
+            rows={8}
+            style={styles.textarea}
+          />
+
+          {error && <div style={styles.error}>{error}</div>}
+
+          <button
+            type="submit"
+            disabled={loading}
+            style={{
+              ...styles.button,
+              ...(loading ? styles.buttonDisabled : {}),
+            }}
+          >
             {loading ? 'Generating BRD...' : 'Generate BRD'}
           </button>
         </form>
 
-        {error && <div style={styles.error}>{error}</div>}
-
         {result && (
-          <div style={styles.result}>
-            <p style={styles.resultTitle}>BRD Generated Successfully!</p>
+          <div style={styles.resultCard}>
+            <h2 style={styles.resultTitle}>✨ BRD generated successfully</h2>
             {result.documentId && (
-              <p style={{ fontSize: '13px', color: '#2d6a4f' }}>
+              <div style={styles.resultRow}>
                 Document ID: <strong>{result.documentId}</strong>
-              </p>
+              </div>
             )}
-            {result.viewUrl && (
-              <a href={result.viewUrl} target="_blank" rel="noopener noreferrer" style={styles.link}>
-                Open BRD in Zoho Writer →
-              </a>
-            )}
-            {result.downloadUrl && (
-              <>
-                <br />
-                <a href={result.downloadUrl} target="_blank" rel="noopener noreferrer" style={styles.link}>
+            <div style={styles.resultLinks}>
+              {result.viewUrl && (
+                <a
+                  href={result.viewUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={styles.linkPrimary}
+                >
+                  Open BRD in Zoho Writer →
+                </a>
+              )}
+              {result.downloadUrl && (
+                <a
+                  href={result.downloadUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={styles.linkSecondary}
+                >
                   Download BRD →
                 </a>
-              </>
-            )}
+              )}
+            </div>
           </div>
         )}
-      </div>
+      </main>
+
+      <footer style={styles.footer}>
+        Powered by Zoho Catalyst · Zoho Writer · OpenAI
+      </footer>
     </div>
   );
 }
+
+const styles = {
+  page: {
+    minHeight: '100vh',
+    padding: '48px 20px 80px',
+    fontFamily:
+      "'Inter', 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+  },
+  header: {
+    maxWidth: 880,
+    margin: '0 auto 32px',
+    textAlign: 'center',
+  },
+  brand: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 16,
+    marginBottom: 14,
+  },
+  logo: { height: 36, width: 'auto' },
+  divider: {
+    width: 1,
+    height: 28,
+    background: 'rgba(0,0,0,0.15)',
+  },
+  title: {
+    fontFamily: "'Poppins', 'Inter', sans-serif",
+    fontSize: 30,
+    fontWeight: 700,
+    letterSpacing: '-0.5px',
+    background: `linear-gradient(135deg, ${ZOHO_RED} 0%, ${ZOHO_RED_DARK} 100%)`,
+    WebkitBackgroundClip: 'text',
+    WebkitTextFillColor: 'transparent',
+    backgroundClip: 'text',
+  },
+  subtitle: {
+    color: '#4b5563',
+    fontSize: 15,
+    lineHeight: 1.6,
+    maxWidth: 640,
+    margin: '0 auto',
+  },
+  main: {
+    maxWidth: 720,
+    margin: '0 auto',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 20,
+  },
+  card: {
+    background: 'rgba(255,255,255,0.75)',
+    backdropFilter: 'blur(14px)',
+    WebkitBackdropFilter: 'blur(14px)',
+    border: '1px solid rgba(255,255,255,0.6)',
+    borderRadius: 18,
+    padding: 28,
+    boxShadow:
+      '0 10px 30px rgba(228, 37, 39, 0.08), 0 2px 6px rgba(0,0,0,0.04)',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 14,
+  },
+  sectionLabel: {
+    fontSize: 13,
+    fontWeight: 600,
+    color: '#374151',
+    letterSpacing: '0.3px',
+    textTransform: 'uppercase',
+  },
+  dropzone: {
+    border: '2px dashed #f0c4c5',
+    borderRadius: 14,
+    padding: '28px 20px',
+    textAlign: 'center',
+    cursor: 'pointer',
+    background: 'rgba(255,255,255,0.6)',
+    transition: 'all 0.2s ease',
+  },
+  dropzoneActive: {
+    borderColor: ZOHO_RED,
+    background: '#fef2f2',
+    transform: 'scale(1.01)',
+  },
+  dropIcon: {
+    fontSize: 28,
+    color: ZOHO_RED,
+    marginBottom: 8,
+  },
+  dropTitle: {
+    fontSize: 15,
+    fontWeight: 600,
+    color: '#111827',
+    marginBottom: 4,
+  },
+  dropHint: { fontSize: 12.5, color: '#6b7280' },
+  orRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 12,
+    margin: '6px 0',
+  },
+  orLine: { flex: 1, height: 1, background: 'rgba(0,0,0,0.08)' },
+  orText: {
+    fontSize: 12,
+    color: '#9ca3af',
+    fontWeight: 600,
+    letterSpacing: '1px',
+  },
+  textarea: {
+    width: '100%',
+    border: '1px solid #e5e7eb',
+    borderRadius: 12,
+    padding: '12px 14px',
+    fontSize: 14,
+    fontFamily: 'inherit',
+    resize: 'vertical',
+    background: 'rgba(255,255,255,0.8)',
+    outline: 'none',
+    transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
+  },
+  error: {
+    background: '#fef2f2',
+    color: '#991b1b',
+    border: '1px solid #fecaca',
+    padding: '10px 14px',
+    borderRadius: 10,
+    fontSize: 13.5,
+    fontWeight: 500,
+  },
+  button: {
+    marginTop: 6,
+    padding: '14px 20px',
+    fontSize: 15,
+    fontWeight: 600,
+    color: '#fff',
+    border: 'none',
+    borderRadius: 12,
+    cursor: 'pointer',
+    background: `linear-gradient(135deg, ${ZOHO_RED} 0%, ${ZOHO_RED_DARK} 100%)`,
+    boxShadow: '0 8px 20px rgba(228, 37, 39, 0.35)',
+    transition: 'transform 0.15s ease, box-shadow 0.15s ease, opacity 0.2s',
+    letterSpacing: '0.2px',
+  },
+  buttonDisabled: {
+    opacity: 0.7,
+    cursor: 'not-allowed',
+    boxShadow: 'none',
+  },
+  resultCard: {
+    background: 'rgba(255,255,255,0.85)',
+    backdropFilter: 'blur(14px)',
+    WebkitBackdropFilter: 'blur(14px)',
+    border: '1px solid rgba(228, 37, 39, 0.15)',
+    borderLeft: `4px solid ${ZOHO_RED}`,
+    borderRadius: 16,
+    padding: 24,
+    boxShadow: '0 8px 24px rgba(0,0,0,0.06)',
+  },
+  resultTitle: {
+    fontFamily: "'Poppins', 'Inter', sans-serif",
+    fontSize: 18,
+    fontWeight: 700,
+    color: '#111827',
+    marginBottom: 10,
+  },
+  resultRow: {
+    fontSize: 14,
+    color: '#374151',
+    marginBottom: 14,
+    wordBreak: 'break-all',
+  },
+  resultLinks: { display: 'flex', flexWrap: 'wrap', gap: 12 },
+  linkPrimary: {
+    display: 'inline-block',
+    padding: '10px 16px',
+    background: `linear-gradient(135deg, ${ZOHO_RED} 0%, ${ZOHO_RED_DARK} 100%)`,
+    color: '#fff',
+    borderRadius: 10,
+    textDecoration: 'none',
+    fontWeight: 600,
+    fontSize: 14,
+    boxShadow: '0 6px 14px rgba(228, 37, 39, 0.3)',
+  },
+  linkSecondary: {
+    display: 'inline-block',
+    padding: '10px 16px',
+    background: '#fff',
+    color: ZOHO_RED_DARK,
+    border: `1px solid ${ZOHO_RED}`,
+    borderRadius: 10,
+    textDecoration: 'none',
+    fontWeight: 600,
+    fontSize: 14,
+  },
+  footer: {
+    textAlign: 'center',
+    color: '#6b7280',
+    fontSize: 12.5,
+    marginTop: 40,
+    letterSpacing: '0.3px',
+  },
+};
+
+export default App;
