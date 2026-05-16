@@ -2,8 +2,7 @@ import React, { useRef, useState, useEffect } from 'react';
 
 const API_BASE = process.env.REACT_APP_API_BASE_URL || '';
 
-const ZOHO_LOGO =
-  'https://www.zohowebstatic.com/sites/zweb/images/zoho_general_pages/zoho-logo-web.svg';
+const ZOHO_LOGO = (process.env.PUBLIC_URL || '') + '/zoho-logo.svg';
 
 const ZOHO_RED = '#E42527';
 const ZOHO_RED_DARK = '#C8202C';
