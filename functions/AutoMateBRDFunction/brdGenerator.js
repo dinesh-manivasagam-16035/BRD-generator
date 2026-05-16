@@ -98,16 +98,31 @@ async function generateBRD(transcript, projectDetails, openai, managerInputs = '
   // Model id differs by backend: OpenAI direct uses 'gpt-4o-mini',
   // GitHub Models proxy uses 'openai/gpt-4o-mini'.
   const model = process.env.OPENAI_API_KEY ? 'gpt-4o-mini' : 'openai/gpt-4o-mini';
-  const completion = await openai.chat.completions.create({
-    model,
-    messages: [
-      { role: 'system', content: BRD_SYSTEM_PROMPT },
-      { role: 'user', content: BRD_USER_PROMPT(transcript, projectDetails, managerInputs) }
-    ],
-    temperature: 0.2,
-    max_tokens: 4096,
-    response_format: { type: 'json_object' }
-  });
+  let completion;
+  try {
+    completion = await openai.chat.completions.create({
+      model,
+      messages: [
+        { role: 'system', content: BRD_SYSTEM_PROMPT },
+        { role: 'user', content: BRD_USER_PROMPT(transcript, projectDetails, managerInputs) }
+      ],
+      temperature: 0.2,
+      max_tokens: 4096,
+      response_format: { type: 'json_object' }
+    });
+  } catch (e) {
+    console.error('[generateBRD] openai call failed:', {
+      status: e.status,
+      code: e.code,
+      message: e.message,
+      headers: e.headers,
+    });
+    const err = new Error(e.message);
+    err.status = e.status;
+    err.headers = e.headers;
+    err.code = e.code;
+    throw err;
+  }
 
   const raw = completion.choices[0].message.content;
   return JSON.parse(raw);

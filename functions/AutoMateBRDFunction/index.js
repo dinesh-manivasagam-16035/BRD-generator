@@ -63,13 +63,29 @@ app.get('/', (_req, res) => {
   res.json({
     service: 'AutoMateBRDFunction',
     status: 'ok',
-    endpoints: ['/health', '/generate-brd', '/push-to-zoho'],
+    endpoints: ['/health', '/debug-env', '/generate-brd', '/push-to-zoho'],
   });
 });
 
 // ── Health check ──────────────────────────────────────────────────────────────
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// ── Debug env (TEMPORARY — remove after verification) ─────────────────────────
+app.get('/debug-env', (_req, res) => {
+  const t = process.env.GITHUB_TOKEN;
+  const o = process.env.OPENAI_API_KEY;
+  res.json({
+    hasGithubToken: !!t,
+    githubTokenLength: t ? t.length : 0,
+    githubTokenPrefix: t ? t.slice(0, 12) : null,
+    hasOpenAIKey: !!o,
+    nodeVersion: process.version,
+    envKeys: Object.keys(process.env).filter(k =>
+      /TOKEN|KEY|ZOHO|GITHUB|OPENAI/i.test(k)
+    ),
+  });
 });
 
 // ── POST /generate-brd ────────────────────────────────────────────────────────
@@ -169,9 +185,11 @@ app.post('/generate-brd', upload.single('audio'), async (req, res) => {
 
   } catch (err) {
     console.error('[generate-brd] Error:', err);
-    return res.status(500).json({
+    return res.status(err.status || 500).json({
       success: false,
       error: err.message || 'An unexpected error occurred.',
+      code: err.code,
+      status: err.status,
     });
   } finally {
     // Clean up temp file
