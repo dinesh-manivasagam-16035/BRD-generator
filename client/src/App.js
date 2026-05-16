@@ -161,7 +161,7 @@ function App() {
         <div style={styles.brand}>
           <img src={ZOHO_LOGO} alt="Zoho" style={styles.logo} />
           <div style={styles.divider} />
-          <h1 style={styles.title}>Smbs-BRD Generator</h1>
+          <h1 style={styles.title}>BRDPilot</h1>
         </div>
         <p style={styles.subtitle}>
           AI-powered Business Requirements Documents for Zoho implementations —
