@@ -16,15 +16,17 @@ const app = express();
 let _openai = null;
 function getOpenAI() {
   if (_openai) return _openai;
-  const apiKey = process.env.GITHUB_TOKEN || process.env.OPENAI_API_KEY;
+  // Prefer OpenAI direct; fall back to GitHub Models proxy if only GITHUB_TOKEN is set.
+  const useOpenAI = !!process.env.OPENAI_API_KEY;
+  const apiKey = useOpenAI ? process.env.OPENAI_API_KEY : process.env.GITHUB_TOKEN;
   if (!apiKey) {
-    const err = new Error('Missing GITHUB_TOKEN / OPENAI_API_KEY env var');
+    const err = new Error('Missing OPENAI_API_KEY / GITHUB_TOKEN env var');
     err.code = 'MISSING_LLM_KEY';
     throw err;
   }
   _openai = new OpenAI({
     apiKey,
-    baseURL: process.env.GITHUB_TOKEN ? 'https://models.github.ai/inference' : undefined,
+    baseURL: useOpenAI ? undefined : 'https://models.github.ai/inference',
   });
   return _openai;
 }
@@ -54,10 +56,15 @@ const upload = multer({
   },
 });
 
-// ── Static files ─────────────────────────────────────────────────────────────
-app.use(express.static(path.join(__dirname, '../../public')));
+// ── Root ─────────────────────────────────────────────────────────────────────
+// SPA is served by the Catalyst Client (`AutoMateBRDClient` mapped to `/*`).
+// This function only exposes API endpoints under /server/AutoMateBRDFunction/.
 app.get('/', (_req, res) => {
-  res.sendFile(path.join(__dirname, '../../public/index.html'));
+  res.json({
+    service: 'AutoMateBRDFunction',
+    status: 'ok',
+    endpoints: ['/health', '/generate-brd', '/push-to-zoho'],
+  });
 });
 
 // ── Health check ──────────────────────────────────────────────────────────────

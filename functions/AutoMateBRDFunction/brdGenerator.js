@@ -95,8 +95,11 @@ Rules:
 `;
 
 async function generateBRD(transcript, projectDetails, openai, managerInputs = '') {
+  // Model id differs by backend: OpenAI direct uses 'gpt-4o-mini',
+  // GitHub Models proxy uses 'openai/gpt-4o-mini'.
+  const model = process.env.OPENAI_API_KEY ? 'gpt-4o-mini' : 'openai/gpt-4o-mini';
   const completion = await openai.chat.completions.create({
-    model: 'openai/gpt-4o-mini',
+    model,
     messages: [
       { role: 'system', content: BRD_SYSTEM_PROMPT },
       { role: 'user', content: BRD_USER_PROMPT(transcript, projectDetails, managerInputs) }
