@@ -16,7 +16,7 @@
   "client": [
     {
       "clientName": "AutoMateBRDClient",
-      "directory": "client/build"
+      "directory": "build"
     }
   ],
   "web": [
