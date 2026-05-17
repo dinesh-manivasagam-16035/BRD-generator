@@ -63,7 +63,7 @@ app.get('/', (_req, res) => {
   res.json({
     service: 'AutoMateBRDFunction',
     status: 'ok',
-    endpoints: ['/health', '/debug-env', '/generate-brd', '/push-to-zoho'],
+    endpoints: ['/health', '/debug-env', '/debug-models', '/generate-brd', '/push-to-zoho'],
   });
 });
 
@@ -79,8 +79,12 @@ app.get('/debug-env', (_req, res) => {
   res.json({
     hasGithubToken: !!t,
     githubTokenLength: t ? t.length : 0,
-    githubTokenPrefix: t ? t.slice(0, 12) : null,
+    githubTokenPrefix: t ? t.slice(0, 25) : null,
+    githubTokenSuffix: t ? t.slice(-6) : null,
     hasOpenAIKey: !!o,
+    openAIKeyLength: o ? o.length : 0,
+    openAIKeyPrefix: o ? o.slice(0, 25) : null,
+    openAIKeySuffix: o ? o.slice(-6) : null,
     nodeVersion: process.version,
     envKeys: Object.keys(process.env).filter(k =>
       /TOKEN|KEY|ZOHO|GITHUB|OPENAI/i.test(k)
