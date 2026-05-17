@@ -18,7 +18,8 @@ async function getZohoAccessToken() {
   });
 
   const response = await axios.post(accountsUrl, params.toString(), {
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    timeout: 20000
   });
 
   if (!response.data.access_token) {
@@ -242,7 +243,8 @@ async function createZohoWriterDoc(brd, projectDetails, editedHtml) {
         'Content-Length': contentLength
       },
       maxContentLength: Infinity,
-      maxBodyLength: Infinity
+      maxBodyLength: Infinity,
+      timeout: 60000
     });
   } catch (err) {
     console.error('[ZohoWriter] POST /documents failed');
