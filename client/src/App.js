@@ -118,22 +118,58 @@ function App() {
   const handlePush = async () => {
     setError('');
     setLoading(true);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 110000); // 110s, under Catalyst 120s
     try {
-      const editedHtml = previewRef.current ? previewRef.current.innerHTML : previewHtml;
-      const res = await fetch(`${API_BASE}/push-to-zoho`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ brd, editedHtml, projectDetails }),
-      });
-      const data = await res.json();
+      // Prefer the source HTML over the rendered DOM to avoid inlined mermaid SVG bloat.
+      const renderedHtml = previewRef.current ? previewRef.current.innerHTML : '';
+      const sourceHtml = previewHtml || '';
+      let editedHtml = sourceHtml || renderedHtml;
+      // If user actually edited the preview, the rendered DOM may differ; only fall back to it
+      // when source is empty. Strip any inlined <svg> blocks to keep payload small.
+      if (!editedHtml && renderedHtml) editedHtml = renderedHtml;
+      editedHtml = editedHtml.replace(/<svg[\s\S]*?<\/svg>/gi, '');
+
+      const payload = JSON.stringify({ brd, editedHtml, projectDetails });
+      const sizeKb = (new Blob([payload]).size / 1024).toFixed(1);
+      // eslint-disable-next-line no-console
+      console.log(`[push-to-zoho] payload size: ${sizeKb} KB`);
+
+      let res;
+      try {
+        res = await fetch(`${API_BASE}/push-to-zoho`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: payload,
+          signal: controller.signal,
+        });
+      } catch (netErr) {
+        if (netErr.name === 'AbortError') {
+          throw new Error('Request timed out after 110s. Try again or reduce content size.');
+        }
+        // eslint-disable-next-line no-console
+        console.error('[push-to-zoho] network error:', netErr);
+        throw new Error(`Network error: ${netErr.message}. Check console / DevTools Network tab.`);
+      }
+
+      let data;
+      try {
+        data = await res.json();
+      } catch (parseErr) {
+        const text = await res.text().catch(() => '');
+        throw new Error(`Invalid response (${res.status}): ${text.slice(0, 200) || parseErr.message}`);
+      }
       if (!res.ok || !data.success) {
         throw new Error(data.error || `Push failed (${res.status})`);
       }
       setPushResult(data);
       setStep(3);
     } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('[push-to-zoho] error:', err);
       setError(err.message || 'Push to Zoho Writer failed.');
     } finally {
+      clearTimeout(timeoutId);
       setLoading(false);
     }
   };
