@@ -209,9 +209,18 @@ app.post('/generate-brd', upload.single('audio'), async (req, res) => {
  *   { brd, editedHtml, projectDetails }
  * and we create the Zoho Writer document from the edited HTML.
  */
-app.post('/push-to-zoho', async (req, res) => {
+app.post('/push-to-zoho', express.text({ type: '*/*', limit: '10mb' }), async (req, res) => {
   try {
-    const { brd, editedHtml, projectDetails } = req.body || {};
+    // Body may arrive as a JSON string (text/plain to avoid CORS preflight)
+    // or as a parsed object (application/json via express.json()).
+    let body = req.body;
+    if (typeof body === 'string') {
+      try { body = JSON.parse(body); }
+      catch (e) {
+        return res.status(400).json({ success: false, error: 'Invalid JSON body.' });
+      }
+    }
+    const { brd, editedHtml, projectDetails } = body || {};
     if (!projectDetails || (!editedHtml && !brd)) {
       return res.status(400).json({
         success: false,
