@@ -10,7 +10,7 @@
     "main": "index.js"
   },
   "env_variables": {
-    "GITHUB_TOKEN": "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",
+    "GITHUB_TOKEN": "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",
     "ZOHO_CLIENT_ID": "1000.GT95EUM6H29J0SU5UBIGUC5IZ9T3ZE",
     "ZOHO_CLIENT_SECRET": "07a2c65c91ea702f276bddc82b96f87e43566dce5b",
     "ZOHO_REFRESH_TOKEN": "1000.6c17fd7fad6afcb2b8ff89f28308de1c.27ca25c7df3ee27eaf79b9ab254f0313",
