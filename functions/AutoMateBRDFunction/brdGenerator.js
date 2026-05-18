@@ -2,6 +2,23 @@
 
 const BRD_SYSTEM_PROMPT = `You are a Senior Zoho Implementation Business Analyst with 15+ years of experience implementing the Zoho One suite (Zoho CRM, Zoho Desk, Zoho Books, Zoho People, Zoho Creator, Zoho Analytics, Zoho Campaigns, Zoho Inventory, Zoho Projects, Zoho SalesIQ, Zoho Mail, Zoho Flow, Zoho Cliq, Zoho Forms, Zoho Sign, Zoho Survey, etc.) for enterprise clients. You identify EVERY Zoho product required for the engagement, produce a separate implementation block per product (modules, customizations, workflows, integrations, functional requirements), and design cross-product integration workflows expressed as Mermaid flowcharts. Always return valid JSON only — no markdown, no code fences.`;
 
+// GitHub Models proxy caps gpt-4o-mini input at 8000 tokens (~32000 chars).
+// System prompt + JSON schema instructions ≈ 1200 tokens, so we cap the
+// user-supplied free-text fields to stay safely under the limit.
+const MAX_TRANSCRIPT_CHARS = 20000;
+const MAX_MANAGER_INPUT_CHARS = 3000;
+const MAX_DESCRIPTION_CHARS = 1500;
+
+function clampText(text, max) {
+  if (!text) return text;
+  const s = String(text);
+  if (s.length <= max) return s;
+  // Keep the head (most context-rich) and a tail snippet for closure.
+  const headLen = Math.floor(max * 0.8);
+  const tailLen = max - headLen - 40;
+  return `${s.slice(0, headLen)}\n\n...[TRUNCATED ${s.length - max} chars]...\n\n${s.slice(-tailLen)}`;
+}
+
 const BRD_USER_PROMPT = (transcript, projectDetails, managerInputs) => `
 Analyze the following meeting transcript and project details, then generate a comprehensive BRD in JSON.
 
@@ -10,13 +27,13 @@ PROJECT INFORMATION:
 - Client / Company: ${projectDetails.clientName || 'TBD'}
 - Analyst: ${projectDetails.analystName || 'Business Analyst'}
 - Date: ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
-- Project Description: ${projectDetails.projectDescription || 'N/A'}
+- Project Description: ${clampText(projectDetails.projectDescription, MAX_DESCRIPTION_CHARS) || 'N/A'}
 
 MEETING TRANSCRIPT:
-${transcript}
+${clampText(transcript, MAX_TRANSCRIPT_CHARS)}
 ${managerInputs ? `
 ADDITIONAL MANAGER NOTES / CLARIFICATIONS (treat as authoritative; merge with transcript):
-${managerInputs}
+${clampText(managerInputs, MAX_MANAGER_INPUT_CHARS)}
 ` : ''}
 
 Return a JSON object with EXACTLY this structure:
@@ -98,6 +115,12 @@ async function generateBRD(transcript, projectDetails, openai, managerInputs = '
   // Model id differs by backend: OpenAI direct uses 'gpt-4o-mini',
   // GitHub Models proxy uses 'openai/gpt-4o-mini'.
   const model = process.env.OPENAI_API_KEY ? 'gpt-4o-mini' : 'openai/gpt-4o-mini';
+  console.log('[generateBRD] input lengths', {
+    transcript: transcript ? String(transcript).length : 0,
+    managerInputs: managerInputs ? String(managerInputs).length : 0,
+    description: projectDetails && projectDetails.projectDescription ? String(projectDetails.projectDescription).length : 0,
+    model,
+  });
   let completion;
   try {
     completion = await openai.chat.completions.create({
