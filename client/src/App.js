@@ -2,8 +2,6 @@ import React, { useRef, useState, useEffect } from 'react';
 
 const API_BASE = process.env.REACT_APP_API_BASE_URL || '';
 
-const ZOHO_LOGO = (process.env.PUBLIC_URL || '') + '/zoho-logo.svg';
-
 const ZOHO_RED = '#E42527';
 const ZOHO_RED_DARK = '#C8202C';
 const ZOHO_BLUE = '#226DB4';
@@ -14,6 +12,20 @@ const ZOHO_PRODUCTS = [
   'Zoho Campaigns', 'Zoho SalesIQ', 'Zoho Mail', 'Zoho Cliq',
   'Zoho WorkDrive', 'Zoho Sign', 'Zoho Flow', 'Zoho Forms', 'Zoho Survey',
 ];
+
+function ZohoLogo() {
+  return (
+    <svg width="110" height="40" viewBox="0 0 110 40" xmlns="http://www.w3.org/2000/svg" aria-label="Zoho" role="img">
+      <defs>
+        <linearGradient id="zohoGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stopColor="#E42527" />
+          <stop offset="100%" stopColor="#C8202C" />
+        </linearGradient>
+      </defs>
+      <text x="0" y="31" fontFamily="Poppins, Inter, -apple-system, Segoe UI, Roboto, sans-serif" fontSize="34" fontWeight="800" fill="url(#zohoGrad)" letterSpacing="-1">Zoho</text>
+    </svg>
+  );
+}
 
 function App() {
   const [step, setStep] = useState(1);
@@ -39,6 +51,8 @@ function App() {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [stage, setStage] = useState('');
+  const [progress, setProgress] = useState(0);
   const inputRef = useRef(null);
   const previewRef = useRef(null);
 
@@ -95,29 +109,43 @@ function App() {
     formData.append('selectedProducts', JSON.stringify(selectedProducts));
 
     setLoading(true);
+    setStage('Preparing transcript…');
+    setProgress(10);
     try {
+      setStage('Uploading & transcribing…');
+      setProgress(30);
       const res = await fetch(`${API_BASE}/generate-brd`, {
         method: 'POST',
         body: formData,
       });
+      setStage('Generating BRD…');
+      setProgress(65);
       const data = await res.json();
       if (!res.ok || !data.success) {
+        if (data && data.code === 'RATE_LIMIT') {
+          throw new Error('GitHub Models rate limit hit — please retry in ~60 seconds.');
+        }
         throw new Error(data.error || `Request failed (${res.status})`);
       }
       setBrd(data.brd);
       setPreviewHtml(data.html || '');
       setProjectDetails(data.projectDetails || null);
+      setProgress(100);
       setStep(2);
     } catch (err) {
       setError(err.message || 'Something went wrong. Please try again.');
     } finally {
       setLoading(false);
+      setStage('');
+      setProgress(0);
     }
   };
 
   const handlePush = async () => {
     setError('');
     setLoading(true);
+    setStage('Pushing to Zoho Writer…');
+    setProgress(85);
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 110000); // 110s, under Catalyst 120s
     try {
@@ -137,9 +165,12 @@ function App() {
 
       let res;
       try {
+        // Use text/plain to keep this a "simple" CORS request and avoid the
+        // OPTIONS preflight (Catalyst's edge layer strips CORS headers from
+        // preflight responses, which would otherwise cause "Failed to fetch").
         res = await fetch(`${API_BASE}/push-to-zoho`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
           body: payload,
           signal: controller.signal,
         });
@@ -163,6 +194,7 @@ function App() {
         throw new Error(data.error || `Push failed (${res.status})`);
       }
       setPushResult(data);
+      setProgress(100);
       setStep(3);
     } catch (err) {
       // eslint-disable-next-line no-console
@@ -171,6 +203,8 @@ function App() {
     } finally {
       clearTimeout(timeoutId);
       setLoading(false);
+      setStage('');
+      setProgress(0);
     }
   };
 
@@ -195,7 +229,7 @@ function App() {
     <div style={styles.page}>
       <header style={styles.header}>
         <div style={styles.brand}>
-          <img src={ZOHO_LOGO} alt="Zoho" style={styles.logo} />
+          <ZohoLogo />
           <div style={styles.divider} />
           <h1 style={styles.title}>BRDPilot</h1>
         </div>
@@ -231,6 +265,17 @@ function App() {
       </div>
 
       <main style={styles.main}>
+        {loading && (
+          <div style={{ margin: '0 0 16px' }}>
+            <div style={{ height: 8, background: '#f1f1f1', borderRadius: 4, overflow: 'hidden' }}>
+              <div style={{ width: `${progress}%`, height: '100%', background: ZOHO_RED, transition: 'width 0.3s ease' }} />
+            </div>
+            <div style={{ fontSize: 13, color: '#555', marginTop: 6, display: 'flex', justifyContent: 'space-between' }}>
+              <span>{stage}</span>
+              <span>{progress}%</span>
+            </div>
+          </div>
+        )}
         {step === 1 && (
           <form onSubmit={handleGenerate} style={styles.card}>
             <label style={styles.sectionLabel}>Project details</label>

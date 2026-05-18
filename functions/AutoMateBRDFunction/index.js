@@ -63,33 +63,13 @@ app.get('/', (_req, res) => {
   res.json({
     service: 'AutoMateBRDFunction',
     status: 'ok',
-    endpoints: ['/health', '/debug-env', '/debug-models', '/generate-brd', '/push-to-zoho'],
+    endpoints: ['/health', '/debug-models', '/generate-brd', '/push-to-zoho'],
   });
 });
 
 // ── Health check ──────────────────────────────────────────────────────────────
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
-});
-
-// ── Debug env (TEMPORARY — remove after verification) ─────────────────────────
-app.get('/debug-env', (_req, res) => {
-  const t = process.env.GITHUB_TOKEN;
-  const o = process.env.OPENAI_API_KEY;
-  res.json({
-    hasGithubToken: !!t,
-    githubTokenLength: t ? t.length : 0,
-    githubTokenPrefix: t ? t.slice(0, 25) : null,
-    githubTokenSuffix: t ? t.slice(-6) : null,
-    hasOpenAIKey: !!o,
-    openAIKeyLength: o ? o.length : 0,
-    openAIKeyPrefix: o ? o.slice(0, 25) : null,
-    openAIKeySuffix: o ? o.slice(-6) : null,
-    nodeVersion: process.version,
-    envKeys: Object.keys(process.env).filter(k =>
-      /TOKEN|KEY|ZOHO|GITHUB|OPENAI/i.test(k)
-    ),
-  });
 });
 
 // ── POST /generate-brd ────────────────────────────────────────────────────────
@@ -189,6 +169,22 @@ app.post('/generate-brd', upload.single('audio'), async (req, res) => {
 
   } catch (err) {
     console.error('[generate-brd] Error:', err);
+
+    // Detect GitHub Models / OpenAI rate-limit (429) and surface a friendly message.
+    const msg = (err && err.message) ? String(err.message) : '';
+    const isRateLimit =
+      err && (err.status === 429 || err.code === 'rate_limit_exceeded' ||
+        /rate.?limit|quota|too many requests/i.test(msg));
+
+    if (isRateLimit) {
+      return res.status(429).json({
+        success: false,
+        error: 'AI provider rate limit reached. GitHub Models free tier allows ~8 requests/minute and ~50/day per model. Please wait ~60 seconds and try again.',
+        code: 'RATE_LIMIT',
+        retryAfterSec: 60,
+      });
+    }
+
     return res.status(err.status || 500).json({
       success: false,
       error: err.message || 'An unexpected error occurred.',
